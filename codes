@@ -1,0 +1,233 @@
+# restaurant-review-
+sentiment analysis of restaurant review by using the nlp model
+
+#importing the library
+import numpy as np
+import pandas as pd
+from google.colab import drive
+drive.mount('/content/drive')
+
+df = pd.read_csv('/content/drive/MyDrive/Restaurant_Reviews.tvt',delimiter='\t',quoting=3)
+
+df.shape
+
+df.head(10)
+
+df.columns
+
+df.info
+
+
+
+#Performing NLP on the data.
+import nltk
+import re
+nltk.download('stopwords')
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+
+
+#cleaning the Revies
+corpus =[]
+for i in range(0,1000):
+
+   review =re.sub(pattern='[^a-zA-Z]', repl='', string=str(df['Review'][i]))
+
+   review = review.lower()
+
+   review_words = review.split()
+
+   review_words = [word for word in review_words if not word in set(stopwords.words('english'))]
+
+   ps = PorterStemmer()
+   review = [ps.stem(word) for word in review_words]
+
+   review = ' '.join(review)
+
+   corpus.append(review)
+
+
+   corpus[0:1500]
+
+
+   #creating the bags of words model
+
+from sklearn.feature_extraction.text import CountVectorizer
+cv = CountVectorizer(max_features=1500)    #max_features=1500
+X = cv.fit_transform(corpus).toarray()
+Y = df.iloc[:,1].values
+
+
+
+from sklearn.model_selection import train_test_split #used to test  the data into training data and test data
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size = 0.20,random_state= 0)
+
+X_train.shape,X_test.shape,Y_train.shape,Y_test.shape
+
+# fitting navie bayes to the training set
+
+from sklearn.naive_bayes import MultinomialNB
+
+classifier =MultinomialNB()
+classifier.fit(X_train,Y_train) #fit training data
+
+[punc for punc in string.punctuation]
+
+def text_process(msg):
+  nopunc =[ char for  char in msg if char not in string.punctuation]
+  nopunc=''.join(nopunc)
+  return ''.join([word for word in nopunc.split() if word.lower() not in stopwords.words('english')])
+
+  df.head()
+
+df['tokenized_Review'] =df['Review'].apply(text_process)
+
+df.head()
+
+
+
+# Import library
+#positive review
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+word_cloud = df.loc[df['Liked'] == 1,:]
+text = ''.join([text for text in word_cloud['Review']])
+#Generate a WordCloud object
+wordcloud = WordCloud(width=800,height=400, background_color='white').generate(text)
+#Display the word cloud using  Matplotlib
+plt.figure(figsize=(10,5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.show()
+
+# Import library
+#negetive review
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+word_cloud = df.loc[df['Liked'] == 0,:]
+text = ''.join([text for text in word_cloud['Review']])
+#Generate a WordCloud object
+wordcloud = WordCloud(width=800,height=400, background_color='white').generate(text)
+#Display the word cloud using  Matplotlib
+plt.figure(figsize=(10,5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.show()
+
+
+from sklearn.feature_extraction.text import CountVectorizer
+
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+vectorizer = CountVectorizer(max_df = 0.5,min_df = 2)
+X = vectorizer.fit_transform(df['tokenized_Review']).toarray()
+
+X
+
+from sklearn.model_selection import train_test_split
+
+X_train,X_test,Y_train,Y_test = train_test_split(df['tokenized_Review'],df['Liked'],random_state=107,test_size=0.2)
+
+
+
+X_train.head()
+
+train_vetorized = vectorizer.transform(X_train)
+test_vectorized = vectorizer.transform(X_test)
+
+X_train_array=train_vetorized.toarray()
+X_test_array= test_vectorized.toarray()
+
+from sklearn.naive_bayes import GaussianNB
+nb = GaussianNB()
+nb.fit(X_train_array , Y_train)
+
+Y_train_preds_nb = nb.predict(X_train_array)
+Y_test_preds_nb = nb.predict(X_test_array)
+
+Y_test_preds_nb
+
+Y_test
+
+
+pd.DataFrame({"actual_Y_value":Y_test, "predicted_Y_value":Y_test_preds_nb})
+
+from sklearn.metrics import accuracy_score,recall_score,precision_score, f1_score,roc_auc_score,confusion_matrix, roc_curve, auc, classification_report
+
+def print_metrics(actual, predicted):
+  print('accuracy_score is{}'.format(accuracy_score(actual,predicted)))
+  print('precision_score is{}'.format(precision_score(actual,predicted)))
+
+  print('recall_score is{}'.format(recall_score(actual,predicted)))
+  print('f1_score is{}'.format(f1_score(actual,predicted)))
+  print('roc_auc_score is{}'.format(roc_auc_score(actual, predicted)))
+  print('confusion_matrix is{}'.format(confusion_matrix(actual,predicted)))
+  print('classification_report is{}'.format(classification_report(actual,predicted)))
+
+
+  # Evaluation of training model
+print_metrics(Y_train, Y_train_preds_nb)
+
+
+#Evaluation of testing model
+print_metrics(Y_test, Y_test_preds_nb)
+
+from sklearn.naive_bayes import MultinomialNB
+
+#Model Generation Using Navie Bayes
+mnv=MultinomialNB()
+mnv.fit(X_train_array ,Y_train)
+
+
+
+
+Y_train_preds_mnv =mnv.predict(X_train_array)
+Y_test_preds_mnv =mnv.predict(X_test_array)
+
+
+Y_test_preds_mnv
+
+
+print_metrics(Y_train, Y_train_preds_mnv)
+
+
+
+#Hyper prameter tuning
+best_accuracy=0.0
+alpha_val=0
+
+for i in np.arange(0.01,1.1,0.1):
+  temp_cls=MultinomialNB(alpha=i)
+  temp_cls.fit(X_train_array , Y_train)
+  Y_test_pred_h_nbayes = temp_cls.predict(X_test_array)
+  score=accuracy_score(Y_test,Y_test_pred_h_nbayes)
+  print("accuracy score for alpha-{}  is :{}%".format(round(i,1),round(score*100,2)))
+  if score>best_accuracy:
+    best_accuracy=score
+    alpha_val=i
+    print(".........................................")
+    print("the best accuracy is {}% with alpha value as {}".format(round(best_accuracy*100,2),round(alpha_val,1)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
